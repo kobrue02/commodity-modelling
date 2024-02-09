@@ -5,7 +5,7 @@ import seaborn as sns
 
 from typing import Optional
 
-from ..util.exceptions.exceptions import BadDateFormat
+from ..util.exceptions.exceptions import BadDateFormat, DateNotInDataError
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +84,16 @@ class GoldPriceData:
         plot = sns.lineplot(x="Normalized_Date", y="vals", hue='Currency', data=dfm.to_pandas())
         return plot
 
-    def __find_closest_match(self, date: str):
+    def __find_closest_match(self, date):
 
         items = self.data['Normalized_Date'].to_list()
         closest_match = min(items, key=lambda x: abs(x - date))
-
-        return closest_match
+        
+        diff = date - closest_match
+        if diff.days < 50:
+            return closest_match
+        else:
+            raise DateNotInDataError('No datapoint near {} was found.'.format(str(date)))
 
     def set_tightness(self, tightness: str = 'tight'):
         self._tightness = tightness
