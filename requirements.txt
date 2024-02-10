@@ -1,2 +1,6 @@
+huggingface
+matplotlib
 polars
 seaborn
+tensorflow
+transformers
