@@ -1,11 +1,6 @@
-import datetime
 import logging
 import polars as pl
-import seaborn as sns
 
-from typing import Optional
-
-from ..util.exceptions.exceptions import BadDateFormat
 from ..price_data import HistoricPriceData
 
 logger = logging.getLogger(__name__)

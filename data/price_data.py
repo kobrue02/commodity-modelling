@@ -4,11 +4,6 @@ import matplotlib.pyplot as plt
 import polars as pl
 import seaborn as sns
 
-from dataclasses import dataclass
-
-from dateutil.relativedelta import relativedelta
-from typing import Optional
-
 from .util.exceptions.exceptions import DateNotInDataError, BadDateFormat
 
 logger = logging.getLogger(__name__)
@@ -59,7 +54,12 @@ class HistoricPriceData:
         if src == 'dmy':
             day, month, year = datestring.split('-')
         elif src == 'ymd':
-            year, month, day = datestring.partition('T')[0].split('-')
+            if "-" in datestring:
+                year, month, day = datestring.partition('T')[0].split('-')
+            else:
+                year = datestring[:4]
+                month = datestring[4:6]
+                day = datestring[6:]
         else:
             raise BadDateFormat('The date must be either in DD-MM-YYYY or YYYY-MM-DD format.')
         

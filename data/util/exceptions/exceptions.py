@@ -3,3 +3,6 @@ class BadDateFormat(Exception):
 
 class DateNotInDataError(Exception):
     pass
+
+class UnsupportedMetric(Exception):
+    pass
