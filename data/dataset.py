@@ -18,57 +18,52 @@ class MergedDataset:
     Merge datasets of different commodities and economic factors into one large polars DataFrame.
     """
     def __init__(self, **kwargs) -> None:
+        
+        ALLOWED_KEYS = {'gold', 'oil', 'sp500'}
+        supported_kwargs = {k: v for k, v in kwargs.items() if k in ALLOWED_KEYS}
 
         # unpacking keyword arguments
-        self.gold: GoldPriceData = kwargs.get('gold', None)
-        self.oil: OilPriceData = kwargs.get('oil', None)
-        self.sp500: SP500Data = kwargs.get('sp500', None)
+        self.__dict__.update(supported_kwargs)
+        self.__factors = list(supported_kwargs.keys())
 
         # output
         self.data = self.__build_merged_dataset()
 
     def __build_merged_dataset(self) -> pl.DataFrame:
-        date_lst = []
-        oil_lst = []
-        gold_lst = []
-        sp500_lst = []
 
+        prices = {}
         initial_date = self.oil.data['Normalized_Date'].to_list()[0]  # fix later
+
+        for factor in self.__factors:
+            prices[factor] = []
+            prices[factor].append(getattr(self, factor)[initial_date])
+
+        date_lst = []
         date_lst.append(initial_date)
-
-        initial_oil_price = self.oil[initial_date]
-        oil_lst.append(initial_oil_price)
-
-        initial_gold_price = self.gold[initial_date]
-        gold_lst.append(initial_gold_price)
-
-        initial_sp500_price = self.sp500[initial_date]
-        sp500_lst.append(initial_sp500_price)
-
+            
         current_date = initial_date
-        for i in range(len(self.oil.data['Normalized_Date'].to_list())):
 
+        for i in range(len(self.oil.data['Normalized_Date'].to_list())):
+            
+            current_prices = {}
             current_date = current_date + relativedelta(months=1)
 
             try:
-                current_oil_price = self.oil[current_date]
-                current_gold_price = self.gold[current_date]
-                current_sp500_price = self.sp500[current_date]
+                for factor in self.__factors:
+                    current_prices[factor] = getattr(self, factor)[current_date]
 
             except DateNotInDataError:
                 break
 
+            for factor in self.__factors:
+                prices[factor].append(current_prices[factor])
+            
             date_lst.append(current_date)
-            oil_lst.append(current_oil_price)
-            gold_lst.append(current_gold_price)
-            sp500_lst.append(current_sp500_price)
 
         merged_dataset_dict = {
-            'date': date_lst,
-            'gold': gold_lst,
-            'oil': oil_lst,
-            'sp500': sp500_lst
+            'date': date_lst
         }
+        merged_dataset_dict.update(prices)
 
         return pl.from_dict(merged_dataset_dict)
     
