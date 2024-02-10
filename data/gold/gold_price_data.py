@@ -66,8 +66,5 @@ class GoldPriceData(HistoricPriceData):
             date = val
             currency = self._currencies[0]
 
-        return self.getval(
-            val=date, 
-            column=currency,
-            tightness=self._tightness)
+        return self.getval(date, currency)
         

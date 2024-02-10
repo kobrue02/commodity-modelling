@@ -17,7 +17,11 @@ class HistoricPriceData:
 
 
     def __init__(self, **kwargs) -> None:
-
+        """
+        :param str kind: "monthly" or "annual", specifies time steps of data
+        :param str tightness: whether only exact match of a date should be returned, or fuzzy matching is okay. default = "loose"
+        :param str date_range: "all" to take into account the entire available data.
+        """
         # unpacking kwargs
         default_args = {
             '_kind': 'monthly',
@@ -53,9 +57,9 @@ class HistoricPriceData:
         :paran str datestring: the string from the csv
         """
         if src == 'dmy':
-            day, month, year = tuple(datestring.split('-'))
+            day, month, year = datestring.split('-')
         elif src == 'ymd':
-            year, month, day = tuple(datestring.partition('T')[0].split('-'))
+            year, month, day = datestring.partition('T')[0].split('-')
         else:
             raise BadDateFormat('The date must be either in DD-MM-YYYY or YYYY-MM-DD format.')
         
@@ -84,8 +88,7 @@ class HistoricPriceData:
     
     def getval(self,
                val,
-               column: str = 'price',
-               tightness: Optional[str] = 'loose'
+               column: str = 'price'
                ) -> None:
 
         """
@@ -112,10 +115,10 @@ class HistoricPriceData:
             price = price[0]
         
         else:  # otherwise find the nearest date
-            if tightness == 'loose':
+            if self._tightness == 'loose':
                 date = self.find_closest_match(date)
                 price = self.data.filter(pl.col('Normalized_Date') == date)[column][0]
 
-            if tightness == 'tight':
+            if self._tightness == 'tight':
                 return None
         return price

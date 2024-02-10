@@ -40,4 +40,4 @@ class OilPriceData(HistoricPriceData):
         col = 'price'
         date = val
 
-        return self.getval(val=date, column=col)
+        return self.getval(date, col)

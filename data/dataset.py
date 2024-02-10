@@ -39,8 +39,8 @@ class MergedDataset:
         # the values for each column will be collected in lists
         # get the value of each dataset at the initial date
         for factor in self.__factors:
-            prices[factor] = []
-            prices[factor].append(getattr(self, factor)[initial_date])
+            prices[f'{factor}_price'] = []
+            prices[f'{factor}_price'].append(getattr(self, factor)[initial_date])
 
         date_lst = []
         date_lst.append(initial_date)
@@ -62,7 +62,7 @@ class MergedDataset:
                 break
 
             for factor in self.__factors:
-                prices[factor].append(current_prices[factor])
+                prices[f'{factor}_price'].append(current_prices[factor])
             
             date_lst.append(current_date)
 
@@ -74,17 +74,50 @@ class MergedDataset:
 
         return pl.from_dict(merged_dataset_dict)
     
-    def plot(self):
+    def add_pct_changes(self, inplace: bool = True):
+        for factor in self.__factors:
+            col_name = f'{factor}_price'
+
+            if inplace:
+                self.data = self.data.with_columns(pl.col(col_name).pct_change().alias("{}_pct_change".format(factor)))
+            else:
+                df = self.data.clone()
+                return df.with_columns(pl.col(col_name).pct_change().alias("{}_pct_change".format(factor)))
+    
+    def add_gains(self, inplace: bool = True):
+
+        for factor in self.__factors:
+            col_name = f'{factor}_price'
+            initial_value: float = self.data[col_name].to_list()[0]
+
+            if inplace:
+                self.data = self.data.with_columns([(pl.col(col_name).apply(lambda x: self.__pct_gains(initial_value, x)).alias(f'{factor}_gains'))])
+            else:
+                df = self.data.clone()
+                return df.with_columns([(pl.col(col_name).apply(lambda x: self.__pct_gains(initial_value, x)).alias(f'{factor}_gains'))])
+
+    def __pct_gains(self, initial: float, current: float) -> float:
+        return (current - initial) / initial * 100
+
+    def plot(self, kind: str = 'price'):
         # prepare the data for plotting
-        dfm = self.__transform_data_for_plot()
+        dfm = self.__transform_data_for_plot(kind)
 
         # make a lineplot
-        plot = sns.lineplot(x="date", y="Price", hue='Commodity', data=dfm.to_pandas())
+        plot = sns.lineplot(x="date", y=kind, hue='Commodity', data=dfm.to_pandas())
+        plot.set(xlabel="Date", ylabel="Gains in %", title='Performance of different investments over time')
         return plot
     
-    def __transform_data_for_plot(self) -> pl.DataFrame:
+    def __transform_data_for_plot(self, kind: str) -> pl.DataFrame:
 
-        dfm: pl.DataFrame = self.data.melt('date', variable_name='Commodity', value_name='Price')
+        cols = [col for col in self.data.columns if kind in col]
+        cols = ["date"] + cols
+
+        df: pl.DataFrame = self.data[cols].clone()
+        df = df.rename(lambda column_name: column_name.split('_')[0])
+
+        dfm: pl.DataFrame = df.melt('date', variable_name='Commodity', value_name=kind)
+        
         return dfm
 
 
@@ -94,13 +127,6 @@ if __name__ == "__main__":
 
     sp500 = SP500Data()
     gold = GoldPriceData(currencies=['United States(USD)'])
-
-    #plot = gold.plot(
-    #    y_column='price',
-    #    normalize_data=True
-    #    )
-    #plt.show()
-
     oil = OilPriceData()
 
     merged_dataset = MergedDataset(
@@ -109,6 +135,10 @@ if __name__ == "__main__":
         sp500 = sp500
     )
 
+    # merged_dataset.add_pct_changes()
+    merged_dataset.add_gains()
+
     print(merged_dataset.data.head())
-    plot = merged_dataset.plot()
+
+    plot = merged_dataset.plot(kind='gains')
     plt.show()
