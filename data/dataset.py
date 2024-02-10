@@ -30,28 +30,34 @@ class MergedDataset:
         self.data = self.__build_merged_dataset()
 
     def __build_merged_dataset(self) -> pl.DataFrame:
-
+        """
+        Merge all given datasets into one by using the date column as a common index.
+        """
         prices = {}
         initial_date = self.oil.data['Normalized_Date'].to_list()[0]  # fix later
 
+        # the values for each column will be collected in lists
+        # get the value of each dataset at the initial date
         for factor in self.__factors:
             prices[factor] = []
             prices[factor].append(getattr(self, factor)[initial_date])
 
         date_lst = []
         date_lst.append(initial_date)
-            
+        
         current_date = initial_date
 
+        # iterate over each month
         for i in range(len(self.oil.data['Normalized_Date'].to_list())):
             
             current_prices = {}
-            current_date = current_date + relativedelta(months=1)
+            current_date = current_date + relativedelta(months=1)  # add 1 month
 
             try:
                 for factor in self.__factors:
                     current_prices[factor] = getattr(self, factor)[current_date]
 
+            # once the end of one dataset is reached, break loop
             except DateNotInDataError:
                 break
 
@@ -60,6 +66,7 @@ class MergedDataset:
             
             date_lst.append(current_date)
 
+        # add all info in a dict which polars can interpret
         merged_dataset_dict = {
             'date': date_lst
         }
@@ -75,7 +82,7 @@ class MergedDataset:
         plot = sns.lineplot(x="date", y="Price", hue='Commodity', data=dfm.to_pandas())
         return plot
     
-    def __transform_data_for_plot(self):
+    def __transform_data_for_plot(self) -> pl.DataFrame:
 
         dfm: pl.DataFrame = self.data.melt('date', variable_name='Commodity', value_name='Price')
         return dfm
@@ -87,6 +94,13 @@ if __name__ == "__main__":
 
     sp500 = SP500Data()
     gold = GoldPriceData(currencies=['United States(USD)'])
+
+    #plot = gold.plot(
+    #    y_column='price',
+    #    normalize_data=True
+    #    )
+    #plt.show()
+
     oil = OilPriceData()
 
     merged_dataset = MergedDataset(
