@@ -2,5 +2,6 @@ huggingface
 matplotlib
 polars
 seaborn
+sklearn
 tensorflow
 transformers

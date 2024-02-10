@@ -114,13 +114,15 @@ class MergedDataset:
     
     def add_pct_changes(self, inplace: bool = True):
         for factor in self.__factors:
+            if 'news' in factor:
+                continue
             col_name = f'{factor}_price'
 
             if inplace:
-                self.data = self.data.with_columns(pl.col(col_name).pct_change().alias("{}_pct_change".format(factor)))
+                self.data = self.data.with_columns(pl.col(col_name).pct_change().alias("{}_pct_change".format(factor))).fill_null(strategy='zero')
             else:
                 df = self.data.clone()
-                return df.with_columns(pl.col(col_name).pct_change().alias("{}_pct_change".format(factor)))
+                return df.with_columns(pl.col(col_name).pct_change().alias("{}_pct_change".format(factor))).fill_null(strategy='zero')
     
     def add_gains(self, inplace: bool = True):
 
@@ -129,7 +131,7 @@ class MergedDataset:
             if factor in self.commodities:
                 col_name = f'{factor}_price'
             elif factor == 'news':
-                col_name = 'news_sentiment'
+                continue
             initial_value: float = self.data[col_name].to_list()[0]
 
             if inplace:
@@ -138,6 +140,35 @@ class MergedDataset:
                 df = self.data.clone()
                 return df.with_columns([(pl.col(col_name).apply(lambda x: self.__pct_gains(initial_value, x)).alias(f'{factor}_gains'))])
 
+    def __add_future(self, date, future_gap: int, col: str):
+        old_date = date
+        future_date = date + relativedelta(months=future_gap)
+
+        old_price = self.data.filter(pl.col('date') == old_date).select(col).item()
+
+        try:
+            future_price = self.data.filter(pl.col('date') == future_date).select(col).item()
+        except ValueError:
+            return None
+
+        return future_price
+    
+    def add_future(self, column: str = 'sp500_price', gap: int = 6, inplace: bool = True):
+        if inplace:
+            self.data = self.data.with_columns(
+                [(pl.col('date').apply(lambda x: self.__add_future(
+                    x,
+                    future_gap=gap,
+                    col=column
+                    )).alias(f'{column}_after_{gap}_months'))])
+        else:
+            return self.data.with_columns(
+                    [(pl.col('date').apply(lambda x: self.__add_future(
+                        x,
+                        future_gap=gap,
+                        col=column
+                        )).alias(f'{column}_after_{gap}_months'))])
+    
     def __pct_gains(self, initial: float, current: float) -> float:
         return (current - initial) / initial * 100
 
@@ -188,8 +219,9 @@ class MergedDataset:
         
         return dfm
 
-
-
+    def clean(self):
+        self.data = self.data.select(pl.all().interpolate())
+        self.data = self.data.drop_nulls()
 
 if __name__ == "__main__":
 
