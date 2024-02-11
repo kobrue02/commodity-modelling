@@ -112,9 +112,9 @@ class MergedDataset:
 
         return pl.from_dict(merged_dataset_dict)
     
-    def add_pct_changes(self, inplace: bool = True):
+    def add_pct_changes(self, inplace: bool = True, skip: str = None):
         for factor in self.__factors:
-            if 'news' in factor:
+            if 'news' in factor or factor == skip:
                 continue
             col_name = f'{factor}_price'
 
@@ -124,14 +124,14 @@ class MergedDataset:
                 df = self.data.clone()
                 return df.with_columns(pl.col(col_name).pct_change().alias("{}_pct_change".format(factor))).fill_null(strategy='zero')
     
-    def add_gains(self, inplace: bool = True):
+    def add_gains(self, inplace: bool = True, skip: str = None):
 
         for factor in self.__factors:
-
+            if factor == skip or factor == 'news':
+                continue
             if factor in self.commodities:
                 col_name = f'{factor}_price'
-            elif factor == 'news':
-                continue
+
             initial_value: float = self.data[col_name].to_list()[0]
 
             if inplace:
@@ -150,8 +150,16 @@ class MergedDataset:
             future_price = self.data.filter(pl.col('date') == future_date).select(col).item()
         except ValueError:
             return None
+        
+        diff = future_price - old_price
 
-        return future_price
+        if diff > 50:
+            signal = 'buy'
+        elif -50 < diff <= 50:
+            signal = 'hold'
+        else:
+            signal = 'sell'
+        return signal
     
     def add_future(self, column: str = 'sp500_price', gap: int = 6, inplace: bool = True):
         if inplace:
@@ -160,15 +168,23 @@ class MergedDataset:
                     x,
                     future_gap=gap,
                     col=column
-                    )).alias(f'{column}_after_{gap}_months'))])
+                    )).alias(f'{column}_signal'))])
         else:
             return self.data.with_columns(
                     [(pl.col('date').apply(lambda x: self.__add_future(
                         x,
                         future_gap=gap,
                         col=column
-                        )).alias(f'{column}_after_{gap}_months'))])
+                        )).alias(f'{column}_signal'))])
     
+    def add_moving_average(self, skip: str, window: int = 50):
+        for factor in self.__factors:
+            if factor == skip or factor == 'news':
+                continue
+            # N-day moving average
+            self.data = self.data.with_columns([(pl.col(f'{factor}_price').rolling_mean(window_size=window).alias(f'{factor}_MA_{window}'))])
+            self.data = self.data.with_columns([(pl.col(f'{factor}_price').rolling_mean(window_size=window).alias(f'{factor}_MA_{window}'))])
+
     def __pct_gains(self, initial: float, current: float) -> float:
         return (current - initial) / initial * 100
 
